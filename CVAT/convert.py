@@ -75,9 +75,10 @@ def create_yaml(name):
     with open(name + '.yaml', 'w') as yaml_file:
         yaml.dump(yaml_data, yaml_file)
 
-# run functions
-create_dataset(name="crystals400labels", src_annotations="annotations")
-create_yaml("crystals400labels")
+# Name dataset and create dataset. 
+name = "crystals_20_02_2024"
+create_dataset(name, src_annotations="annotations")
+create_yaml(name)
 
 
 

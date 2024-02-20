@@ -163,8 +163,7 @@ CVAT/annotations/
 *.pt
 
 # The generated datasets.
-datasets/crystals/
-datasets/crystals400labels/
+datasets/
 
 # The generated annotations from CVAT.
 CVAT/annotations.zip
