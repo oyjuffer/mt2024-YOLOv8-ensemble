@@ -76,7 +76,7 @@ def create_yaml(name):
         yaml.dump(yaml_data, yaml_file)
 
 # Name dataset and create dataset. 
-name = "crystals_20_02_2024"
+name = "crystals_2600"
 create_dataset(name, src_annotations="annotations")
 create_yaml(name)
 
