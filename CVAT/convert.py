@@ -2,6 +2,7 @@ from sklearn.model_selection import train_test_split
 import os
 import shutil
 import yaml
+import cv2
 
 def create_dataset(name, src_annotations):
     """
@@ -27,6 +28,8 @@ def create_dataset(name, src_annotations):
 
         # Get the path to the image and label files
         src_image = os.path.join('CVAT\images', file_name + '.jpg')
+        src_image = cv2.cvtColor(src_image, cv2.COLOR_BGR2GRAY)
+
         if not os.path.exists(src_image):
             src_image = os.path.join('CVAT\images', file_name + '.png')
         src_label = os.path.join(f'CVAT\{src_annotations}', file_name + '.txt')
@@ -45,6 +48,8 @@ def create_dataset(name, src_annotations):
 
         # Get the path to the image and label files
         src_image = os.path.join('CVAT\images', file_name + '.jpg')
+        src_image = cv2.cvtColor(src_image, cv2.COLOR_BGR2GRAY)
+        
         if not os.path.exists(src_image):
             src_image = os.path.join('CVAT\images', file_name + '.png')
         src_label = os.path.join(f'CVAT\{src_annotations}', file_name + '.txt')
