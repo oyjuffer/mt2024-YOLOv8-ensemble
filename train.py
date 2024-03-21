@@ -2,7 +2,7 @@ from ultralytics import YOLO
 import gc
 import torch
 
-def main(n):
+def train(n):
 
     for i in range(n):
 
@@ -25,6 +25,6 @@ def main(n):
 
 if __name__ == '__main__':
     n = 3
-    main(n)
+    train(n)
 
     torch.cuda.empty_cache()
