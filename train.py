@@ -2,7 +2,10 @@ from ultralytics import YOLO
 import gc
 import torch
 
-def train(n):
+def train():
+
+    name = "YOLOv8n"
+    n = 10
 
     for i in range(n):
 
@@ -11,8 +14,8 @@ def train(n):
                             epochs=100,
                             patience=10,
                             imgsz=608,
-                            project='models',
-                            name=f'yolov8n_{i+1}',
+                            project=f'{name}',
+                            name=f'{i+1}',
                             exist_ok = True,
                             seed = i,
                             deterministic = False)
@@ -24,7 +27,4 @@ def train(n):
 
 
 if __name__ == '__main__':
-    n = 3
-    train(n)
-
-    torch.cuda.empty_cache()
+    train()

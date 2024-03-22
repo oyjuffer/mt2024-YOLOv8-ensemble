@@ -11,10 +11,10 @@ import cv2
 
 def ensemble():
 
-    model_folders = os.listdir("models")
+    model_folders = os.listdir("YOLOv8n")
 
     for folder in model_folders:
-        model = YOLO(os.path.join("models", folder, "weights", "best.pt"))
+        model = YOLO(os.path.join("YOLOv8n", folder, "weights", "best.pt"))
         results = model("test", save_txt=True, save_conf=True, project="ensemble", name=folder)
 
         # release memory
@@ -77,7 +77,7 @@ def iou(box1, box2):
 
 def combine(file_names):
 
-    models = os.listdir("models")
+    models = os.listdir("YOLOv8n")
 
     for name in file_names:
 
@@ -105,7 +105,7 @@ def combine(file_names):
 
             object = []
             for j in range(i, len(b)):
-                if iou((b[i][1], b[i][2], b[i][3], b[i][4]), (b[j][1], b[j][2], b[j][3], b[j][4])) > 0.5 and b[i][0] == b[j][0]:       
+                if iou((b[i][1], b[i][2], b[i][3], b[i][4]), (b[j][1], b[j][2], b[j][3], b[j][4])) > 0.55 and b[i][0] == b[j][0]:       
                     if j not in checked:
                         checked.append(j)
                         object.append(b[j]) 
