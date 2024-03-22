@@ -151,19 +151,13 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# The images from MARCO and annotations from CVAT zipped.
-CVAT/images.zip
-CVAT/annotations.zip
 
-# The unzipped images and annotations from CVAT.
-CVAT/images/
-CVAT/annotations/
+# ignore all images and annotations
+# CVAT/images/
+# CVAT/annotations/
+# datasets/
 
-# All YOLO models are too large for github.
+# ignore all large files
 *.pt
-
-# The generated datasets.
-datasets/
-
-# The generated annotations from CVAT.
-CVAT/annotations.zip
+*.jpg
+*.png
