@@ -1,5 +1,4 @@
 from ultralytics import YOLO
-from PIL import Image, ImageDraw
 
 import numpy as np
 import torch
@@ -8,33 +7,28 @@ import gc
 import json
 import cv2
 
+def ensemble_models(model_path, image_path):
+    """
+    Ensemble function for predicting using multiple models.
 
-def ensemble():
+    Args:
+        model_path (str): Path to the folder containing each ensemble member model.
+        image_path (str): Path to the folder containing the images to be predicted.
+    """
 
-    model_folders = os.listdir("YOLOv8n")
+    # Get the names of the models
+    model_names = os.listdir(model_path)
 
-    for folder in model_folders:
-        model = YOLO(os.path.join("YOLOv8n", folder, "weights", "best.pt"))
-        results = model("test", save_txt=True, save_conf=True, project="ensemble", name=folder)
+    # Predict using each model and save to "ensemble_" folder
+    for model_name in model_names:
+        model = YOLO(os.path.join(model_path, model_name, "weights", "best.pt"))
+        model(image_path, save_txt=True, save_conf=True, project= "ensemble_" + model_path, name=model_name)
 
         # release memory
         del model
         model = None
         gc.collect()
         torch.cuda.empty_cache()
-
-def load_objects_from_json(json_file):
-    with open(json_file, 'r') as file:
-        data = json.load(file)
-    return data
-
-def get_image_file_names(directory):
-
-    files = os.listdir(directory)
-    image_files = [file for file in files if file.endswith(('.jpg', '.jpeg', '.png'))]
-    image_names = [os.path.splitext(os.path.basename(file))[0] for file in image_files]
-
-    return image_names
 
 def iou(box1, box2):
     """
@@ -75,17 +69,23 @@ def iou(box1, box2):
 
     return iou
 
-def combine(file_names):
+def combine_ensembles(ensemble_path, images_path):
 
-    models = os.listdir("YOLOv8n")
+    ensemble_names = os.listdir(ensemble_path)
+    image_names = os.listdir(images_path)
 
-    for name in file_names:
+    for image_name in image_names:
 
+        image_name = os.path.splitext(os.path.basename(image_name))[0]
+
+        # b holds the combined predictoins of all ensemble members
         b = []
+
+        # objects holds the combined predictions per each object found in an image
         objects = []
 
-        for model in models:
-            predictions = os.path.join("ensemble", model, "labels", name + ".txt")
+        for ensemble_name in ensemble_names:
+            predictions = os.path.join(ensemble_path, ensemble_name, "labels", image_name + ".txt")
 
             if os.path.exists(predictions):
                 with open(predictions, 'r') as file:
@@ -105,26 +105,27 @@ def combine(file_names):
 
             object = []
             for j in range(i, len(b)):
-                if iou((b[i][1], b[i][2], b[i][3], b[i][4]), (b[j][1], b[j][2], b[j][3], b[j][4])) > 0.55 and b[i][0] == b[j][0]:       
-                    if j not in checked:
-                        checked.append(j)
-                        object.append(b[j]) 
+                if iou((b[i][1], b[i][2], b[i][3], b[i][4]), (b[j][1], b[j][2], b[j][3], b[j][4])) > 0.5 and b[i][0] == b[j][0] and j not in checked:       
+                    checked.append(j)
+                    object.append(b[j]) 
 
             if object:
                 objects.append(object)
 
         # save the output to a file
-        path = "ensemble/combined"
+        path = os.path.join(ensemble_path, "combined")
         os.makedirs(path, exist_ok=True)
-        file_path = os.path.join(path, f"{name}.json")
+        file_path = os.path.join(path, f"{image_name}.json")
         with open(file_path, "w") as file:
             json.dump(objects, file, indent=4)
 
-def uncertainty(directory):
+def calculate_uncertainty(ensemble_path, ensemble_count):
 
-    for filename in os.listdir(directory):
-        if os.path.isfile(os.path.join(directory, filename)):
-            with open(os.path.join(directory, filename), 'r') as file:
+    ensemble_combined_path = os.path.join(ensemble_path, "combined")
+
+    for ensemble_combined_name in os.listdir(ensemble_combined_path):
+        if os.path.isfile(os.path.join(ensemble_combined_path, ensemble_combined_name)):
+            with open(os.path.join(ensemble_combined_path, ensemble_combined_name), 'r') as file:
                 data = json.load(file)
 
                 output = []
@@ -153,8 +154,8 @@ def uncertainty(directory):
                     avg_h = round(np.mean(all_h), 6)
                     std_h = round(np.std(all_h), 6)
 
-                    if len(all_confidence) < 3:
-                        all_confidence += [0] * (3 - len(all_confidence))
+                    if len(all_confidence) < ensemble_count:
+                        all_confidence += [0] * (ensemble_count - len(all_confidence))
 
                     avg_confidence = round(np.mean(all_confidence), 6)
                     std_confidence = round(np.std(all_confidence), 6)
@@ -162,28 +163,32 @@ def uncertainty(directory):
                     output.append([label, avg_x, std_x, avg_y, std_y, avg_w, std_w, avg_h, std_h, avg_confidence, std_confidence])
 
         # save the output to a file
-        path = "ensemble/output"
+        path = os.path.join(ensemble_path, "output")
         os.makedirs(path, exist_ok=True)
-        file_path = os.path.join(path, f"{filename}")
+        file_path = os.path.join(path, f"{ensemble_combined_name}")
         with open(file_path, "w") as file:
             json.dump(output, file, indent=4)
 
-def draw(file_names):
+def draw(ensemble_path, image_path, confidence_threshold=0.25):
 
-    for name in file_names:
+    image_names = os.listdir(image_path)
 
-        if os.path.exists(f"test/{name}.jpg"):
-            image = cv2.imread(f"test/{name}.jpg")
-        elif os.path.exists(f"test/{name}.png"):
-            image = cv2.imread(f"test/{name}.png")
-        else:
+    for image_name in image_names:
+
+        image = cv2.imread(os.path.join(image_path, image_name))
+        image_name = os.path.splitext(os.path.basename(image_name))[0]
+
+        with open(os.path.join(ensemble_path, "output", f"{image_name}.json"), 'r') as file:
+            objects = json.load(file)
+
+        if objects is None:
             continue
 
-        json_file = f'ensemble/output/{name}.json'
-        objects = load_objects_from_json(json_file)
+        for object in objects:
+            label, x, x_std, y, y_std, w, w_std, h, h_std, confidence, confidence_std = object
 
-        for obj in objects:
-            label, x, x_std, y, y_std, w, w_std, h, h_std, confidence, confidence_std = obj
+            if confidence < confidence_threshold:
+                continue
 
             height, width = image.shape[:2]
             x1 = int((x - w / 2) * width)
@@ -228,14 +233,20 @@ def draw(file_names):
             cv2.putText(image, f"{object_name}: {confidence:.2f} ({confidence_std:.2f})", (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, colour, 1)
 
         # Save the output image
-        output_directory = "ensemble/images"
-        os.makedirs(output_directory, exist_ok=True)
-        output_path = os.path.join(output_directory, f"{name}.jpg")
+        path = os.path.join(ensemble_path, "images")
+        os.makedirs(path, exist_ok=True)
+        output_path = os.path.join(path, f"{image_name}.jpg")
         cv2.imwrite(output_path, image)
 
 
-ensemble()
-file_names = get_image_file_names("test")
-combine(file_names)
-uncertainty("ensemble/combined")
-draw(file_names)
+# model_path = "YOLOv9c"
+image_path = "images"
+# ensemble_models(model_path, image_path)
+
+ensemble_path = "ensemble_YOLOv9c"
+# combine_ensembles(ensemble_path, image_path)
+# calculate_uncertainty(ensemble_path, ensemble_count=10)
+draw(ensemble_path, image_path, confidence_threshold=0.2)
+
+
+
