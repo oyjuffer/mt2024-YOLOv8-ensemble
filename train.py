@@ -9,7 +9,7 @@ def train():
 
     for i in range(n):
 
-        model = model = YOLO('yolov9c.yaml').load('yolov9c.pt')
+        model = YOLO('yolov9c.yaml').load('yolov9c.pt')
         model.train(data='crystals_2600.yaml', 
                             epochs=100,
                             patience=10,

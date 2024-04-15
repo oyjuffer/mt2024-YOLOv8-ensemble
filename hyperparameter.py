@@ -1,14 +1,14 @@
 from ultralytics import YOLO
-import torch
-import torchvision
 
-model = YOLO('yolov8n.yaml')
-model = YOLO('yolov8n.pt')
+model = YOLO('yolov9c.yaml').load('yolov9c.pt')
 
 model.tune(data='crystals_2600.yaml',
-           patience=3,
-           epochs=25,
+           epochs=100,
+           patience=10,
+           imgsz=608,
            iterations=100,
+           project = "YOLOv9c_search",
+           name = "search",
            plots=False, 
            save=False, 
            val=False

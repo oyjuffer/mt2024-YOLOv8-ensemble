@@ -197,10 +197,6 @@ def draw(ensemble_path, image_path, confidence_threshold=0.25):
             y2 = int((y + h / 2) * height)
 
             # Ensure bounding box stays within image boundaries
-            x1 = max(0, x1)
-            y1 = max(0, y1)
-            x2 = min(width - 1, x2)
-            y2 = min(height - 1, y2)
 
             if label == 0:
                 colour = (255, 0, 0)  # Red
@@ -239,13 +235,13 @@ def draw(ensemble_path, image_path, confidence_threshold=0.25):
         cv2.imwrite(output_path, image)
 
 
-# model_path = "YOLOv9c"
+model_path = "YOLOv9c"
 image_path = "images"
-# ensemble_models(model_path, image_path)
+ensemble_models(model_path, image_path)
 
 ensemble_path = "ensemble_YOLOv9c"
-# combine_ensembles(ensemble_path, image_path)
-# calculate_uncertainty(ensemble_path, ensemble_count=10)
+combine_ensembles(ensemble_path, image_path)
+calculate_uncertainty(ensemble_path, ensemble_count=10)
 draw(ensemble_path, image_path, confidence_threshold=0.2)
 
 
