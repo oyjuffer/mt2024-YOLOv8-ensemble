@@ -1,6 +1,7 @@
 from ultralytics import YOLO
 
 import numpy as np
+from torchvision.ops import nms
 import torch
 import os
 import gc
@@ -22,7 +23,7 @@ def ensemble_models(model_path, image_path):
     # Predict using each model and save to "ensemble_" folder
     for model_name in model_names:
         model = YOLO(os.path.join(model_path, model_name, "weights", "best.pt"))
-        model(image_path, save_txt=True, save_conf=True, project= "ensemble_" + model_path, name=model_name)
+        model(image_path, save_txt=True, save_conf=True, project= "ensemble_" + model_path, name=model_name, conf = 0.25, iou = 1)
 
         # release memory
         del model
@@ -81,9 +82,6 @@ def combine_ensembles(ensemble_path, images_path):
         # b holds the combined predictoins of all ensemble members
         b = []
 
-        # objects holds the combined predictions per each object found in an image
-        objects = []
-
         for ensemble_name in ensemble_names:
             predictions = os.path.join(ensemble_path, ensemble_name, "labels", image_name + ".txt")
 
@@ -100,14 +98,15 @@ def combine_ensembles(ensemble_path, images_path):
                         b.append((label, x, y, width, height, confidence))
 
         # perform pairwise comparison of bounding boxes
-        checked = []
+        objects = []    # holds the combined predictions per each object found in an image 
+        checked = []    # holds the indices of the bounding boxes that have been checked
         for i in range(len(b)):
 
-            object = []
+            object = [] # holds the combined predictions of the bounding boxes that are part of the same object
             for j in range(i, len(b)):
                 if iou((b[i][1], b[i][2], b[i][3], b[i][4]), (b[j][1], b[j][2], b[j][3], b[j][4])) > 0.5 and b[i][0] == b[j][0] and j not in checked:       
                     checked.append(j)
-                    object.append(b[j]) 
+                    object.append(b[j])
 
             if object:
                 objects.append(object)
@@ -162,6 +161,12 @@ def calculate_uncertainty(ensemble_path, ensemble_count):
 
                     output.append([label, avg_x, std_x, avg_y, std_y, avg_w, std_w, avg_h, std_h, avg_confidence, std_confidence])
 
+        # Non-Maximum Suppression (NMS)
+        b_tensor = torch.tensor([(box[1], box[3], box[5], box[7], box[9]) for box in output])
+        scores = b_tensor[:, 4]
+        selected_indices = nms(b_tensor[:, :4], scores, 0.5)
+        output = [output[selected_indices] for selected_indices in selected_indices]
+
         # save the output to a file
         path = os.path.join(ensemble_path, "output")
         os.makedirs(path, exist_ok=True)
@@ -169,7 +174,7 @@ def calculate_uncertainty(ensemble_path, ensemble_count):
         with open(file_path, "w") as file:
             json.dump(output, file, indent=4)
 
-def draw(ensemble_path, image_path, confidence_threshold=0.25):
+def draw(ensemble_path, image_path):
 
     image_names = os.listdir(image_path)
 
@@ -186,9 +191,6 @@ def draw(ensemble_path, image_path, confidence_threshold=0.25):
 
         for object in objects:
             label, x, x_std, y, y_std, w, w_std, h, h_std, confidence, confidence_std = object
-
-            if confidence < confidence_threshold:
-                continue
 
             height, width = image.shape[:2]
             x1 = int((x - w / 2) * width)
@@ -234,15 +236,14 @@ def draw(ensemble_path, image_path, confidence_threshold=0.25):
         output_path = os.path.join(path, f"{image_name}.jpg")
         cv2.imwrite(output_path, image)
 
-
 model_path = "YOLOv9c"
-image_path = "images"
+image_path = "datasets\crystals_2600\images\\test"
 ensemble_models(model_path, image_path)
 
 ensemble_path = "ensemble_YOLOv9c"
 combine_ensembles(ensemble_path, image_path)
 calculate_uncertainty(ensemble_path, ensemble_count=10)
-draw(ensemble_path, image_path, confidence_threshold=0.2)
+draw(ensemble_path, image_path)
 
 
 

@@ -4,12 +4,12 @@ import torch
 
 def train():
 
-    name = "YOLOv9c"
+    name = "YOLOv8s"
     n = 10
 
     for i in range(n):
 
-        model = YOLO('yolov9c.yaml').load('yolov9c.pt')
+        model = YOLO('yolov8s.yaml').load('yolov8s.pt')
         model.train(data='crystals_2600.yaml', 
                             epochs=100,
                             patience=10,
