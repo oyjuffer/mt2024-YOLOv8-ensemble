@@ -2,28 +2,28 @@ from ultralytics import YOLO
 
 import numpy as np
 from torchvision.ops import nms
+from ultralytics.utils.ops import xywh2xyxy
 import torch
 import os
 import gc
 import json
-import cv2
 
-def ensemble_models(model_path, image_path):
+def predict(model_folder, image_path):
     """
-    Ensemble function for predicting using multiple models.
+    Generate predictions using each ensemble member model.
 
     Args:
-        model_path (str): Path to the folder containing each ensemble member model.
+        model_folder (str): Path to the folder containing each ensemble member model.
         image_path (str): Path to the folder containing the images to be predicted.
     """
 
     # Get the names of the models
-    model_names = os.listdir(model_path)
+    model_names = os.listdir(model_folder)
 
     # Predict using each model and save to "ensemble_" folder
     for model_name in model_names:
-        model = YOLO(os.path.join(model_path, model_name, "weights", "best.pt"))
-        model(image_path, save_txt=True, save_conf=True, project= "ensemble_" + model_path, name=model_name, conf = 0.25, iou = 1)
+        model = YOLO(os.path.join(model_folder, model_name, "weights", "best.pt"))
+        model(image_path, save_txt=True, save_conf=True, project= "ensemble_" + model_folder, name=model_name, exist_ok = True, conf = 0.01, iou = 1)
 
         # release memory
         del model
@@ -70,18 +70,26 @@ def iou(box1, box2):
 
     return iou
 
-def combine_ensembles(ensemble_path, images_path):
+def ensemble(ensemble_path, images_path, ensemble_count = 10, confidence_threshold = 0.25, iou_threshold = 0.5, uncertainty_threshold = 5.00):
+    """
+    Combine the predictions of ensemble members for each image.
+
+    Args:
+        ensemble_path (str): Path to the folder containing the ensemble members.
+        images_path (str): Path to the folder containing the images.
+        iou (float): Intersection over Union threshold for combining bounding boxes.
+    """
 
     ensemble_names = os.listdir(ensemble_path)
     image_names = os.listdir(images_path)
 
+    # RUN THE ENSEMBLE FOR EACH IMAGE
     for image_name in image_names:
 
         image_name = os.path.splitext(os.path.basename(image_name))[0]
 
-        # b holds the combined predictoins of all ensemble members
-        b = []
-
+        # LOAD THE PREDICTIONS OF EACH ENSEMBLE MEMBER
+        b = []  # holds the combined predictions of all ensemble members
         for ensemble_name in ensemble_names:
             predictions = os.path.join(ensemble_path, ensemble_name, "labels", image_name + ".txt")
 
@@ -95,155 +103,66 @@ def combine_ensembles(ensemble_path, images_path):
                         width = float(parts[3])
                         height = float(parts[4])
                         confidence = float(parts[5])
-                        b.append((label, x, y, width, height, confidence))
 
-        # perform pairwise comparison of bounding boxes
+                        if confidence > confidence_threshold:
+                            b.append((label, x, y, width, height, confidence))
+
+        # COMBINE THE OBJECTS
         objects = []    # holds the combined predictions per each object found in an image 
         checked = []    # holds the indices of the bounding boxes that have been checked
         for i in range(len(b)):
 
             object = [] # holds the combined predictions of the bounding boxes that are part of the same object
             for j in range(i, len(b)):
-                if iou((b[i][1], b[i][2], b[i][3], b[i][4]), (b[j][1], b[j][2], b[j][3], b[j][4])) > 0.5 and b[i][0] == b[j][0] and j not in checked:       
+                if iou((b[i][1], b[i][2], b[i][3], b[i][4]), (b[j][1], b[j][2], b[j][3], b[j][4])) > iou_threshold and b[i][0] == b[j][0] and j not in checked:       
                     checked.append(j)
                     object.append(b[j])
 
             if object:
                 objects.append(object)
+        
+        # ENSEMBLE THE PREVIOUSLY PREDICTED OBJECTS
+        output = []
+        for obj in objects:
+            all_x, all_y, all_w, all_h, all_confidence = [list(t) for t in zip(*obj)][1:]
 
-        # save the output to a file
-        path = os.path.join(ensemble_path, "combined")
+            avg_x, std_x = np.mean(all_x), np.std(all_x)
+            avg_y, std_y = np.mean(all_y), np.std(all_y)
+            avg_w, std_w = np.mean(all_w), np.std(all_w)
+            avg_h, std_h = np.mean(all_h), np.std(all_h)
+
+            all_confidence += [0] * max(0, ensemble_count - len(all_confidence))
+            avg_confidence, std_confidence = np.mean(all_confidence), np.std(all_confidence)
+            variation_coefficient  = std_confidence / (avg_confidence + 1e-15)
+
+            # apply confidence and/or uncertainty thresholds
+            if avg_confidence > confidence_threshold and variation_coefficient < uncertainty_threshold:
+                output.append([obj[0][0], avg_x, std_x, avg_y, std_y, avg_w, std_w, avg_h, std_h, avg_confidence, variation_coefficient]) 
+    
+        # NON-MAXIMUM SUPPRESSION (NMS)
+        if output:
+            output_tensor = torch.tensor([(o[1], o[3], o[5], o[7], o[9]) for o in output])
+            boxes = xywh2xyxy(output_tensor[:, :4])
+            scores = output_tensor[:, 4]
+            selected_indices = nms(boxes, scores, iou_threshold)
+            output = [output[selected_indices] for selected_indices in selected_indices]
+
+        # DUMP THE ENSEMBLE PREDICTIONS TO A FILE
+        path = ensemble_path + "\\" + "output_" + "{:.2f}".format(uncertainty_threshold) + "\\" + "{:.2f}".format(confidence_threshold) + "_" + "{:.2f}".format(iou_threshold)
         os.makedirs(path, exist_ok=True)
         file_path = os.path.join(path, f"{image_name}.json")
         with open(file_path, "w") as file:
-            json.dump(objects, file, indent=4)
-
-def calculate_uncertainty(ensemble_path, ensemble_count):
-
-    ensemble_combined_path = os.path.join(ensemble_path, "combined")
-
-    for ensemble_combined_name in os.listdir(ensemble_combined_path):
-        if os.path.isfile(os.path.join(ensemble_combined_path, ensemble_combined_name)):
-            with open(os.path.join(ensemble_combined_path, ensemble_combined_name), 'r') as file:
-                data = json.load(file)
-
-                output = []
-
-                for i in range(len(data)):
-                    all_x = []
-                    all_y = []
-                    all_w = []
-                    all_h = []
-                    all_confidence = []
-
-                    for j in range(len(data[i])):
-                        label = data[i][j][0]
-                        all_x.append(data[i][j][1])
-                        all_y.append(data[i][j][2])
-                        all_w.append(data[i][j][3])
-                        all_h.append(data[i][j][4])
-                        all_confidence.append(data[i][j][5])
-
-                    avg_x = round(np.mean(all_x), 6)
-                    std_x = round(np.std(all_x), 6)
-                    avg_y = round(np.mean(all_y), 6)
-                    std_y = round(np.std(all_y), 6)
-                    avg_w = round(np.mean(all_w), 6)
-                    std_w = round(np.std(all_w), 6)
-                    avg_h = round(np.mean(all_h), 6)
-                    std_h = round(np.std(all_h), 6)
-
-                    if len(all_confidence) < ensemble_count:
-                        all_confidence += [0] * (ensemble_count - len(all_confidence))
-
-                    avg_confidence = round(np.mean(all_confidence), 6)
-                    std_confidence = round(np.std(all_confidence), 6)
-
-                    output.append([label, avg_x, std_x, avg_y, std_y, avg_w, std_w, avg_h, std_h, avg_confidence, std_confidence])
-
-        # Non-Maximum Suppression (NMS)
-        b_tensor = torch.tensor([(box[1], box[3], box[5], box[7], box[9]) for box in output])
-        scores = b_tensor[:, 4]
-        selected_indices = nms(b_tensor[:, :4], scores, 0.5)
-        output = [output[selected_indices] for selected_indices in selected_indices]
-
-        # save the output to a file
-        path = os.path.join(ensemble_path, "output")
-        os.makedirs(path, exist_ok=True)
-        file_path = os.path.join(path, f"{ensemble_combined_name}")
-        with open(file_path, "w") as file:
             json.dump(output, file, indent=4)
 
-def draw(ensemble_path, image_path):
-
-    image_names = os.listdir(image_path)
-
-    for image_name in image_names:
-
-        image = cv2.imread(os.path.join(image_path, image_name))
-        image_name = os.path.splitext(os.path.basename(image_name))[0]
-
-        with open(os.path.join(ensemble_path, "output", f"{image_name}.json"), 'r') as file:
-            objects = json.load(file)
-
-        if objects is None:
-            continue
-
-        for object in objects:
-            label, x, x_std, y, y_std, w, w_std, h, h_std, confidence, confidence_std = object
-
-            height, width = image.shape[:2]
-            x1 = int((x - w / 2) * width)
-            y1 = int((y - h / 2) * height)
-            x2 = int((x + w / 2) * width)
-            y2 = int((y + h / 2) * height)
-
-            # Ensure bounding box stays within image boundaries
-
-            if label == 0:
-                colour = (255, 0, 0)  # Red
-                object_name = "others"
-            elif label == 1:
-                colour = (0, 255, )  # Green
-                object_name = "clear"
-            elif label == 2:
-                colour = (0, 0, 255)  # Blue
-                object_name = "crystal"
-            elif label == 3:
-                colour = (255, 255, 0)  # Yellow
-                object_name = "precipitate"
-            elif label == 4:
-                colour = (0, 255, 255)  # Cyan
-                object_name = "crystals"
-            elif label == 5:
-                colour = (255, 0, 255)  # Magenta 
-                object_name = "other"
-            else:
-                colour = (0, 0, 0)  # Default color for unknown label
-                object_name = "unknown"
-
-            cv2.rectangle(image, (x1, y1), (x2, y2), colour, 2)
-
-            # Calculate text position
-            text_x = x1
-            text_y = y1 - 10 if y1 - 10 > 10 else y2 + 20
-
-            cv2.putText(image, f"{object_name}: {confidence:.2f} ({confidence_std:.2f})", (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, colour, 1)
-
-        # Save the output image
-        path = os.path.join(ensemble_path, "images")
-        os.makedirs(path, exist_ok=True)
-        output_path = os.path.join(path, f"{image_name}.jpg")
-        cv2.imwrite(output_path, image)
-
-model_path = "YOLOv9c"
+# GENERATE ENSEMBLE PREDICTIONS AND COMBINE
 image_path = "datasets\crystals_2600\images\\test"
-ensemble_models(model_path, image_path)
+ensemble_count = 10
+confidence_threshold = np.arange(0.01, 1.0, 0.01)
+iou_threshold = 0.5
+uncertainty_threshold = np.arange(1.5, 2.0, 0.1)
 
-ensemble_path = "ensemble_YOLOv9c"
-combine_ensembles(ensemble_path, image_path)
-calculate_uncertainty(ensemble_path, ensemble_count=10)
-draw(ensemble_path, image_path)
+# predict(model_folder = "YOLOv9c", image_path = image_path)
 
-
-
+for u in uncertainty_threshold:
+    for c in confidence_threshold:
+        ensemble("ensemble_YOLOv9c", image_path, ensemble_count, c, iou_threshold, u)

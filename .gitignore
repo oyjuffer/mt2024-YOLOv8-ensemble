@@ -151,12 +151,6 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-
-# ignore all images and annotations
-# CVAT/images/
-# CVAT/annotations/
-# datasets/
-
 # ignore all large files
 *.pt
 *.jpg
