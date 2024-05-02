@@ -157,7 +157,7 @@ def ensemble(ensemble_path, images_path, ensemble_count = 10, confidence_thresho
 # GENERATE ENSEMBLE PREDICTIONS AND COMBINE
 image_path = "datasets\crystals_2600\images\\test"
 ensemble_count = 10
-confidence_threshold = np.arange(0.01, 1.0, 0.01)
+confidence_threshold = 0.1
 iou_threshold = 0.5
 uncertainty_threshold = np.arange(1.5, 2.0, 0.1)
 
@@ -165,4 +165,4 @@ uncertainty_threshold = np.arange(1.5, 2.0, 0.1)
 
 for u in uncertainty_threshold:
     for c in confidence_threshold:
-        ensemble("ensemble_YOLOv9c", image_path, ensemble_count, c, iou_threshold, u)
+        ensemble("ensemble_YOLOv9c", image_path, ensemble_count, c, iou_threshold, u = 1000)

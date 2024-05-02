@@ -2,7 +2,6 @@ from sklearn.model_selection import train_test_split
 import os
 import shutil
 import yaml
-import cv2
 
 def create_dataset(name, src_annotations):
     """
@@ -12,15 +11,23 @@ def create_dataset(name, src_annotations):
     """
     files = os.listdir(f"CVAT/{src_annotations}")
     train_files, val_files = train_test_split(files, test_size=0.2)
+    val_files, test_files = train_test_split(val_files, test_size=0.5)
 
+    # Create the folders for the dataset
     image_train = f'datasets/{name}/images/train'
-    image_val = f'datasets/{name}/images/val'
     label_train = f'datasets/{name}/labels/train'
-    label_val = f'datasets/{name}/labels/val'
     os.makedirs(label_train, exist_ok=True)
-    os.makedirs(label_val, exist_ok=True)
     os.makedirs(image_train, exist_ok=True)
-    os.makedirs(image_val, exist_ok=True)  
+
+    image_val = f'datasets/{name}/images/val'
+    label_val = f'datasets/{name}/labels/val'
+    os.makedirs(label_val, exist_ok=True)
+    os.makedirs(image_val, exist_ok=True)
+
+    image_test = f'datasets/{name}/images/test'
+    label_test = f'datasets/{name}/labels/test'
+    os.makedirs(label_test, exist_ok=True)
+    os.makedirs(image_test, exist_ok=True)
 
     # Copy the image and label files to the train folders
     for file in train_files:
@@ -28,7 +35,6 @@ def create_dataset(name, src_annotations):
 
         # Get the path to the image and label files
         src_image = os.path.join('CVAT\images', file_name + '.jpg')
-        src_image = cv2.cvtColor(src_image, cv2.COLOR_BGR2GRAY)
 
         if not os.path.exists(src_image):
             src_image = os.path.join('CVAT\images', file_name + '.png')
@@ -48,7 +54,6 @@ def create_dataset(name, src_annotations):
 
         # Get the path to the image and label files
         src_image = os.path.join('CVAT\images', file_name + '.jpg')
-        src_image = cv2.cvtColor(src_image, cv2.COLOR_BGR2GRAY)
         
         if not os.path.exists(src_image):
             src_image = os.path.join('CVAT\images', file_name + '.png')
@@ -61,6 +66,26 @@ def create_dataset(name, src_annotations):
 
         shutil.copy(src_image, dst_image)
         shutil.copy(src_label, dst_label)
+
+    # copy the image and label files to the test folders
+    for file in test_files:
+        file_name = os.path.splitext(file)[0]
+
+        # Get the path to the image and label files
+        src_image = os.path.join('CVAT\images', file_name + '.jpg')
+        
+        if not os.path.exists(src_image):
+            src_image = os.path.join('CVAT\images', file_name + '.png')
+        src_label = os.path.join(f'CVAT\{src_annotations}', file_name + '.txt')
+
+        dst_image = os.path.join(image_test, file_name + '.jpg')
+        if not os.path.exists(dst_image):
+            dst_image = os.path.join(image_test, file_name + '.png')
+        dst_label = os.path.join(label_test, file_name + '.txt')
+
+        shutil.copy(src_image, dst_image)
+        shutil.copy(src_label, dst_label)
+
 
 def create_yaml(name):
     yaml_data = {
@@ -81,7 +106,7 @@ def create_yaml(name):
         yaml.dump(yaml_data, yaml_file)
 
 # Name dataset and create dataset. 
-name = "crystals_2600"
+name = "crystals"
 create_dataset(name, src_annotations="annotations")
 create_yaml(name)
 
