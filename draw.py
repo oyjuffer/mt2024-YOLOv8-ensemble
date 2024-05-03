@@ -20,6 +20,9 @@ def draw(predictions_path, image_path, save_path):
         for object in objects:
             label, x, x_std, y, y_std, w, w_std, h, h_std, confidence, confidence_std = object
 
+            if confidence < 0.25:
+                continue
+
             height, width = image.shape[:2]
             x1 = int((x - w / 2) * width)
             y1 = int((y - h / 2) * height)
@@ -67,7 +70,7 @@ def draw(predictions_path, image_path, save_path):
 
 
 # DRAW BOUNDING BOXES ON IMAGES
-predictions_path = "ensemble_YOLOv9c\output_0.60\\0.25_0.50"
-image_path = "datasets\crystals_2600\images\\test"
+predictions_path = "ensemble_YOLOv9c\output\\100.00"
+image_path = "datasets\crystals\images\\test"
 save_path = "ensemble_YOLOv9c"
 draw(predictions_path, image_path, save_path)

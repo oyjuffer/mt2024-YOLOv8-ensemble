@@ -8,9 +8,17 @@ import matplotlib.pyplot as plt
 from ultralytics.utils.metrics import ConfusionMatrix
 from ultralytics.utils.ops import xywh2xyxy
 
-from sklearn.metrics import auc
+# Define class names
+class_names = {
+    0: 'Clustered Other',
+    1: 'Clear',
+    2: 'Discrete Crystal',
+    3: 'Precipitate',
+    4: 'Clustered Crystals',
+    5: 'Discrete Other'
+}
 
-def evaluate_detection_metrics(predictions_folder, test_folder, confidence_threshold, iou_threshold):
+def evaluate(predictions_folder, test_folder, confidence_threshold, iou_threshold):
 
     prediction_files = os.listdir(predictions_folder)
     confusion_matrix = ConfusionMatrix(nc=6, conf=confidence_threshold, iou_thres=iou_threshold, task='detect')
@@ -58,99 +66,149 @@ def evaluate_detection_metrics(predictions_folder, test_folder, confidence_thres
     # tn = matrix.sum() - (tp + fp + fn)
 
 
-    precision = tp / (tp + fp)
-    precision = np.nan_to_num(precision, nan=1.0)
-    recall = tp / (tp + fn)
-    recall = np.nan_to_num(recall, nan=1.0)
-    f1_score = 2 * (precision * recall) / (precision + recall)
+    precision = tp / (tp + fp + 1e-16)
+    recall = tp / (tp + fn + 1e-16)
+    f1_score = 2 * (precision * recall) / (precision + recall + 1e-16)
     # accuracy = (tp + tn) / (tp + tn + fp + fn)
     # fpr = fp / (fp + tn)
     # specificity = tn / (tn + fp)
 
     return matrix, tp, fp, fn, precision, recall, f1_score
 
+def mAP50(output, test):
+    """	
+    Calculate mAP50 for the given predictions and test folder.
 
-ensembles_path = "ensemble_YOLOv9c\output_0"
-test_folder = "datasets\crystals_2600\labels\\test"
+    Args:
+        output (str): Path to the output folder containing the predictions.
+        test (str): Path to the test folder containing the ground truth.
+    Returns:
 
-predictions_folders = os.listdir(ensembles_path)
+    """
+    confidence_threshold = np.arange(0.01, 1.0, 0.01)
+    total_precision = []
+    total_recall = []
+    total_f1_score = []
 
-total_precision = []
-total_recall = []
+    for c in confidence_threshold:
+            matrix, tp, fp, fn, precision, recall, f1_score = evaluate(output, test, c, 0.5)
+            total_precision.append(precision)
+            total_recall.append(recall)
+            total_f1_score.append(f1_score)
 
-for predictions_folder in predictions_folders:
+    precision_classes = [[] for _ in range(len(total_precision[0]))]
+    recall_classes = [[] for _ in range(len(total_recall[0]))]
 
-    predictions_folder_path = os.path.join(ensembles_path, predictions_folder)
-    conf_iou = predictions_folder_path.split('\\')[-1].split('_')
-    conf = float(conf_iou[0])
-    iou = float(conf_iou[1])
+    # reoganize such that each element contains all precision and recall per class
+    for precision, recall in zip(total_precision, total_recall):
+        for i, p in enumerate(precision):
+            precision_classes[i].append(p)
+        for i, r in enumerate(recall):
+            recall_classes[i].append(r)
 
-    matrix, tp, fp, fn, precision, recall, f1_score = evaluate_detection_metrics(predictions_folder_path, test_folder, conf, iou)
+    ap = []
+    plt.figure()
+    for i in range(6):
+        recall_precision_pairs = sorted(zip(recall_classes[i], precision_classes[i]))
+        recall, precision = zip(*recall_precision_pairs)
 
-    total_precision.append(precision)
-    total_recall.append(recall)
+        # Append sentinel values to beginning and end
+        mrec = np.concatenate(([0.0], recall, [1.0]))
+        mpre = np.concatenate(([1.0], precision, [0.0]))
 
-    print(predictions_folder_path)
-    print(matrix)
-    print()
-    print("TP:", tp)
-    print("FP:", fp)
-    print("FN:", fn)
+        x = np.linspace(0, 1, 101)
+        area_under_curve = np.trapz(np.interp(x, mrec, mpre), x)
+        ap.append(area_under_curve)
 
-    print()
-    print("METRICS")
-    print("Precision: \t", precision)
-    print("Recall: \t", recall)
-    print("F1 Score: \t", f1_score)
-    print()
+        plt.plot(mrec, mpre, marker='.', label=class_names[i])
 
-# Precision-Recall Curve
-# generate empty lists of the right length
-precision_classes = [[] for _ in range(len(total_precision[0]))]
-recall_classes = [[] for _ in range(len(total_recall[0]))]
+    # Set labels and title
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title('Precision-Recall Curve')
 
-# reoganize such that each element contains all precision and recall per class
-for precision, recall in zip(total_precision, total_recall):
-    for i, p in enumerate(precision):
-        precision_classes[i].append(p)
-    for i, r in enumerate(recall):
-        recall_classes[i].append(r)
+    # Show legend
+    plt.legend()
 
-# Class names
-class_names = {
-    0: 'Clustered Other',
-    1: 'Clear',
-    2: 'Discrete Crystal',
-    3: 'Precipitate',
-    4: 'Clustered Crystals',
-    5: 'Discrete Other'
-}
+    # Show plot
+    plt.grid(True)
+    plt.savefig("mAP50.png")
+        
+    mAP = np.mean(ap)
 
-ap = []
-for i in range(6):
-    recall_precision_pairs = sorted(zip(recall_classes[i], precision_classes[i]))
-    recall, precision = zip(*recall_precision_pairs)
+    return total_precision, total_recall, total_f1_score, ap, mAP
 
-    area_under_curve = auc(recall, precision)
-    ap.append(area_under_curve)
+def mAP50_95(output, test):
+    """	
+    Calculate mAP50 for the given predictions and test folder.
 
-    # Append sentinel values to beginning and end for the graph 
-    mrec = np.concatenate(([0.0], recall, [1.0]))
-    mpre = np.concatenate(([1.0], precision, [0.0]))
-    plt.plot(mrec, mpre, marker='.', label=class_names[i])
-    
-mAP = np.mean(ap)
+    Args:
+        output (str): Path to the output folder containing the predictions.
+        test (str): Path to the test folder containing the ground truth.
+    Returns:
+
+    """
+    iou_threshold = np.arange(0.5, 0.95, 0.05)
+    total_precision = []
+    total_recall = []
+    total_f1_score = []
+
+    for i in iou_threshold:
+            matrix, tp, fp, fn, precision, recall, f1_score = evaluate(output, test, 0.01, i)
+            total_precision.append(precision)
+            total_recall.append(recall)
+            total_f1_score.append(f1_score)
+
+    precision_classes = [[] for _ in range(len(total_precision[0]))]
+    recall_classes = [[] for _ in range(len(total_recall[0]))]
+
+    # reoganize such that each element contains all precision and recall per class
+    for precision, recall in zip(total_precision, total_recall):
+        for i, p in enumerate(precision):
+            precision_classes[i].append(p)
+        for i, r in enumerate(recall):
+            recall_classes[i].append(r)
+
+    ap = []
+    plt.figure()
+    for i in range(6):
+        recall_precision_pairs = sorted(zip(recall_classes[i], precision_classes[i]))
+        recall, precision = zip(*recall_precision_pairs)
+
+        # Append sentinel values to beginning and end
+        mrec = np.concatenate(([0.0], recall, [1.0]))
+        mpre = np.concatenate(([1.0], precision, [0.0]))
+
+        x = np.linspace(0, 1, 101)
+        area_under_curve = np.trapz(np.interp(x, mrec, mpre), x)
+        ap.append(area_under_curve)
+
+        plt.plot(mrec, mpre, marker='.', label=class_names[i])
+
+    # Set labels and title
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title('Precision-Recall Curve')
+
+    # Show legend
+    plt.legend()
+
+    # Show plot
+    plt.grid(True)
+    plt.savefig("mAP50_95.png")
+        
+    mAP = np.mean(ap)
+
+    return total_precision, total_recall, total_f1_score, ap, mAP
+
+folder = "ensemble_YOLOv9c\output\\1.50"
+
+print("\nmAP50")
+total_precision, total_recall, total_f1_score, ap, mAP = mAP50(folder, "datasets\crystals\labels\\test")
 print("AP Scores:", ap)
 print("mAP Score:", mAP)
 
-# Set labels and title
-plt.xlabel('Recall')
-plt.ylabel('Precision')
-plt.title('Precision-Recall Curve')
-
-# Show legend
-plt.legend()
-
-# Show plot
-plt.grid(True)
-plt.show()
+print("\nmAP50-95")
+total_precision, total_recall, total_f1_score, ap, mAP = mAP50_95(folder, "datasets\crystals\labels\\test")
+print("AP Scores:", ap)
+print("mAP Score:", mAP)

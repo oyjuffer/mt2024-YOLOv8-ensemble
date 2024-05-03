@@ -148,21 +148,24 @@ def ensemble(ensemble_path, images_path, ensemble_count = 10, confidence_thresho
             output = [output[selected_indices] for selected_indices in selected_indices]
 
         # DUMP THE ENSEMBLE PREDICTIONS TO A FILE
-        path = ensemble_path + "\\" + "output_" + "{:.2f}".format(uncertainty_threshold) + "\\" + "{:.2f}".format(confidence_threshold) + "_" + "{:.2f}".format(iou_threshold)
+        path = ensemble_path + "\\" + "output" + "\\" + "{:.2f}".format(uncertainty_threshold)
         os.makedirs(path, exist_ok=True)
         file_path = os.path.join(path, f"{image_name}.json")
         with open(file_path, "w") as file:
             json.dump(output, file, indent=4)
 
 # GENERATE ENSEMBLE PREDICTIONS AND COMBINE
-image_path = "datasets\crystals_2600\images\\test"
+image_path = "datasets\crystals\images\\test"
 ensemble_count = 10
-confidence_threshold = 0.1
+confidence_threshold = 0.01
 iou_threshold = 0.5
-uncertainty_threshold = np.arange(1.5, 2.0, 0.1)
+uncertainty_threshold = np.arange(1.0, 1.6, 0.1)
 
 # predict(model_folder = "YOLOv9c", image_path = image_path)
+# ensemble("ensemble_YOLOv9c", image_path, ensemble_count, confidence_threshold=0.01, iou_threshold = 0.5, uncertainty_threshold = 100)
+
 
 for u in uncertainty_threshold:
-    for c in confidence_threshold:
-        ensemble("ensemble_YOLOv9c", image_path, ensemble_count, c, iou_threshold, u = 1000)
+    ensemble("ensemble_YOLOv9c", image_path, ensemble_count, confidence_threshold, iou_threshold, uncertainty_threshold = u)
+
+
