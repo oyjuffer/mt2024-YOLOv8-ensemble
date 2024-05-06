@@ -92,6 +92,7 @@ def create_yaml(name):
         'path': f'C:\\GitHub\\mt2024-YOLOv8-ensemble\\datasets\\{name}',
         'train': 'images\\train',
         'val': 'images\\val',
+        'test': 'images\\test',
         'names': {
             0: 'clustered other',
             1: 'clear',

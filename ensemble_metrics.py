@@ -3,33 +3,29 @@ import os
 import json
 
 import numpy as np
-import matplotlib.pyplot as plt
-
-from ultralytics.utils.metrics import ConfusionMatrix
+from ultralytics.utils.metrics import DetMetrics, ConfusionMatrix
+from ultralytics.models.yolo.detect import DetectionValidator
 from ultralytics.utils.ops import xywh2xyxy
 
 # Define class names
-class_names = {
-    0: 'Clustered Other',
-    1: 'Clear',
-    2: 'Discrete Crystal',
-    3: 'Precipitate',
-    4: 'Clustered Crystals',
-    5: 'Discrete Other'
-}
+names = {0: 'clustered other', 1: 'clear', 2: 'discrete crystal', 3: 'precipitate', 4: 'clustered crystals', 5: 'discrete other'}
 
-def evaluate(predictions_folder, test_folder, confidence_threshold, iou_threshold):
+
+def evaluate(predictions_folder, test_folder):
 
     prediction_files = os.listdir(predictions_folder)
-    confusion_matrix = ConfusionMatrix(nc=6, conf=confidence_threshold, iou_thres=iou_threshold, task='detect')
+    confusion_matrix = ConfusionMatrix(nc=6, conf=0.01)
+    metrics = DetMetrics(plot = True, names=names)
+    validator = DetectionValidator()
+    stats = dict(tp=[], conf=[], pred_cls=[], target_cls=[])
+    iouv = torch.linspace(0.5, 0.95, 10)
 
     for prediction_file in prediction_files:
 
-
+        # LOAD ALL THE PREDICTIONS
         prediction_file_path = os.path.join(predictions_folder, prediction_file)
         prediction_name = os.path.splitext(prediction_file)[0]
 
-        # Load predictions
         with open(prediction_file_path, "r") as f:
             predictions = json.load(f)
         
@@ -53,162 +49,53 @@ def evaluate(predictions_folder, test_folder, confidence_threshold, iou_threshol
 
         if ground_truth_tensor.size(0) != 0:
             ground_truth_boxes = xywh2xyxy(ground_truth_tensor[:, 1:])
-            ground_truth_classes = ground_truth_tensor[:, :1]
+            ground_truth_classes = ground_truth_tensor[:, :1].squeeze(dim=1)
         else:
             ground_truth_boxes = ground_truth_tensor
             ground_truth_classes = ground_truth_tensor
 
-        confusion_matrix.process_batch(detections, ground_truth_boxes, ground_truth_classes)
 
-    matrix = confusion_matrix.matrix
-    tp, fp = confusion_matrix.tp_fp()
-    fn = (matrix.sum(0)[:-1] - tp)
-    # tn = matrix.sum() - (tp + fp + fn)
+        # PROCESS THE BATCH
+        stat = dict(
+            conf=torch.zeros(0),
+            pred_cls=torch.zeros(0),
+            tp=torch.zeros(len(detections), iouv.numel(), dtype=torch.bool),
+        )
+
+        stat["target_cls"] = ground_truth_classes
+
+        if len(detections) == 0:
+            if len(ground_truth_classes):
+                for k in stats.keys():
+                    stats[k].append(stat[k])
+                    confusion_matrix.process_batch(None, ground_truth_boxes, ground_truth_classes)
+            continue
+
+        stat["conf"] = detections[:, 4]
+        stat["pred_cls"] = detections[:, 5]
+
+        if len(ground_truth_classes):
+            stat["tp"] = validator._process_batch(detections, ground_truth_boxes, ground_truth_classes)
+            confusion_matrix.process_batch(detections, ground_truth_boxes, ground_truth_classes)
+
+        for k in stats.keys():
+            stats[k].append(stat[k])
+
+    stats = {k: torch.cat(v, 0).cpu().numpy() for k, v in stats.items()}
+    if len(stats) and stats["tp"].any():
+        metrics.process(**stats)
+    nt_per_class = np.bincount(stats["target_cls"].astype(int), minlength=6)
+    
+    metrics.confusion_matrix = confusion_matrix
+
+    return metrics
 
 
-    precision = tp / (tp + fp + 1e-16)
-    recall = tp / (tp + fn + 1e-16)
-    f1_score = 2 * (precision * recall) / (precision + recall + 1e-16)
-    # accuracy = (tp + tn) / (tp + tn + fp + fn)
-    # fpr = fp / (fp + tn)
-    # specificity = tn / (tn + fp)
 
-    return matrix, tp, fp, fn, precision, recall, f1_score
 
-def mAP50(output, test):
-    """	
-    Calculate mAP50 for the given predictions and test folder.
+# https://docs.ultralytics.com/reference/utils/metrics/
 
-    Args:
-        output (str): Path to the output folder containing the predictions.
-        test (str): Path to the test folder containing the ground truth.
-    Returns:
+folder = "ensemble_YOLOv9c\output\\100.00"
+results = evaluate(folder, "datasets\crystals\labels\\test")
 
-    """
-    confidence_threshold = np.arange(0.01, 1.0, 0.01)
-    total_precision = []
-    total_recall = []
-    total_f1_score = []
-
-    for c in confidence_threshold:
-            matrix, tp, fp, fn, precision, recall, f1_score = evaluate(output, test, c, 0.5)
-            total_precision.append(precision)
-            total_recall.append(recall)
-            total_f1_score.append(f1_score)
-
-    precision_classes = [[] for _ in range(len(total_precision[0]))]
-    recall_classes = [[] for _ in range(len(total_recall[0]))]
-
-    # reoganize such that each element contains all precision and recall per class
-    for precision, recall in zip(total_precision, total_recall):
-        for i, p in enumerate(precision):
-            precision_classes[i].append(p)
-        for i, r in enumerate(recall):
-            recall_classes[i].append(r)
-
-    ap = []
-    plt.figure()
-    for i in range(6):
-        recall_precision_pairs = sorted(zip(recall_classes[i], precision_classes[i]))
-        recall, precision = zip(*recall_precision_pairs)
-
-        # Append sentinel values to beginning and end
-        mrec = np.concatenate(([0.0], recall, [1.0]))
-        mpre = np.concatenate(([1.0], precision, [0.0]))
-
-        x = np.linspace(0, 1, 101)
-        area_under_curve = np.trapz(np.interp(x, mrec, mpre), x)
-        ap.append(area_under_curve)
-
-        plt.plot(mrec, mpre, marker='.', label=class_names[i])
-
-    # Set labels and title
-    plt.xlabel('Recall')
-    plt.ylabel('Precision')
-    plt.title('Precision-Recall Curve')
-
-    # Show legend
-    plt.legend()
-
-    # Show plot
-    plt.grid(True)
-    plt.savefig("mAP50.png")
-        
-    mAP = np.mean(ap)
-
-    return total_precision, total_recall, total_f1_score, ap, mAP
-
-def mAP50_95(output, test):
-    """	
-    Calculate mAP50 for the given predictions and test folder.
-
-    Args:
-        output (str): Path to the output folder containing the predictions.
-        test (str): Path to the test folder containing the ground truth.
-    Returns:
-
-    """
-    iou_threshold = np.arange(0.5, 0.95, 0.05)
-    total_precision = []
-    total_recall = []
-    total_f1_score = []
-
-    for i in iou_threshold:
-            matrix, tp, fp, fn, precision, recall, f1_score = evaluate(output, test, 0.01, i)
-            total_precision.append(precision)
-            total_recall.append(recall)
-            total_f1_score.append(f1_score)
-
-    precision_classes = [[] for _ in range(len(total_precision[0]))]
-    recall_classes = [[] for _ in range(len(total_recall[0]))]
-
-    # reoganize such that each element contains all precision and recall per class
-    for precision, recall in zip(total_precision, total_recall):
-        for i, p in enumerate(precision):
-            precision_classes[i].append(p)
-        for i, r in enumerate(recall):
-            recall_classes[i].append(r)
-
-    ap = []
-    plt.figure()
-    for i in range(6):
-        recall_precision_pairs = sorted(zip(recall_classes[i], precision_classes[i]))
-        recall, precision = zip(*recall_precision_pairs)
-
-        # Append sentinel values to beginning and end
-        mrec = np.concatenate(([0.0], recall, [1.0]))
-        mpre = np.concatenate(([1.0], precision, [0.0]))
-
-        x = np.linspace(0, 1, 101)
-        area_under_curve = np.trapz(np.interp(x, mrec, mpre), x)
-        ap.append(area_under_curve)
-
-        plt.plot(mrec, mpre, marker='.', label=class_names[i])
-
-    # Set labels and title
-    plt.xlabel('Recall')
-    plt.ylabel('Precision')
-    plt.title('Precision-Recall Curve')
-
-    # Show legend
-    plt.legend()
-
-    # Show plot
-    plt.grid(True)
-    plt.savefig("mAP50_95.png")
-        
-    mAP = np.mean(ap)
-
-    return total_precision, total_recall, total_f1_score, ap, mAP
-
-folder = "ensemble_YOLOv9c\output\\1.50"
-
-print("\nmAP50")
-total_precision, total_recall, total_f1_score, ap, mAP = mAP50(folder, "datasets\crystals\labels\\test")
-print("AP Scores:", ap)
-print("mAP Score:", mAP)
-
-print("\nmAP50-95")
-total_precision, total_recall, total_f1_score, ap, mAP = mAP50_95(folder, "datasets\crystals\labels\\test")
-print("AP Scores:", ap)
-print("mAP Score:", mAP)
+print()

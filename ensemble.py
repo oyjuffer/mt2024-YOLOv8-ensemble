@@ -70,7 +70,7 @@ def iou(box1, box2):
 
     return iou
 
-def ensemble(ensemble_path, images_path, ensemble_count = 10, confidence_threshold = 0.25, iou_threshold = 0.5, uncertainty_threshold = 5.00):
+def ensemble(ensemble_path, images_path, ensemble_count = 10, confidence_threshold = 0.01, iou_threshold = 0.5, uncertainty_threshold = 5.00):
     """
     Combine the predictions of ensemble members for each image.
 
@@ -159,13 +159,11 @@ image_path = "datasets\crystals\images\\test"
 ensemble_count = 10
 confidence_threshold = 0.01
 iou_threshold = 0.5
-uncertainty_threshold = np.arange(1.0, 1.6, 0.1)
+uncertainty_threshold = np.arange(0.1, 1.6, 0.1)
 
-# predict(model_folder = "YOLOv9c", image_path = image_path)
-# ensemble("ensemble_YOLOv9c", image_path, ensemble_count, confidence_threshold=0.01, iou_threshold = 0.5, uncertainty_threshold = 100)
-
+# predict(model_folder = "YOLOv8s-p2", image_path = image_path)
 
 for u in uncertainty_threshold:
-    ensemble("ensemble_YOLOv9c", image_path, ensemble_count, confidence_threshold, iou_threshold, uncertainty_threshold = u)
+    ensemble("ensemble_YOLOv8s-p2", image_path, ensemble_count, confidence_threshold, iou_threshold, uncertainty_threshold = u)
 
 
