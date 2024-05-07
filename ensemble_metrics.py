@@ -45,7 +45,7 @@ def evaluate(predictions_folder, test_folder):
             confidence_class = predictions_tensor[:, [9, 0]]
             detections = torch.cat((predicted_boxes, confidence_class), dim=1)
         else:
-            detections = None
+            detections = []
 
         if ground_truth_tensor.size(0) != 0:
             ground_truth_boxes = xywh2xyxy(ground_truth_tensor[:, 1:])
@@ -95,7 +95,14 @@ def evaluate(predictions_folder, test_folder):
 
 # https://docs.ultralytics.com/reference/utils/metrics/
 
-folder = "ensemble_YOLOv9c\output\\100.00"
+folder = "ensemble_YOLOv8s-p2\output\\1.40"
 results = evaluate(folder, "datasets\crystals\labels\\test")
 
-print()
+print("---RESULTS---")
+print("AP@50: ", results.box.ap50)
+print("mAP@50: ", results.box.map50)
+
+print("AP@50-95: ", results.box.ap)
+print("mAP@50-95: ", results.box.map)
+
+print("F1: ", results.box.f1)

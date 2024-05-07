@@ -61,12 +61,8 @@ def iou(box1, box2):
     # Calculate the union area
     union_area = box1_area + box2_area - intersection_area
 
-    # Handle the case of division by zero
-    if union_area == 0:
-        return 0
-
     # Calculate the IoU
-    iou = intersection_area / union_area
+    iou = intersection_area / union_area + 1e-16
 
     return iou
 
@@ -159,11 +155,9 @@ image_path = "datasets\crystals\images\\test"
 ensemble_count = 10
 confidence_threshold = 0.01
 iou_threshold = 0.5
-uncertainty_threshold = np.arange(0.1, 1.6, 0.1)
+uncertainty_threshold = np.arange(0.1, 2.1, 0.1)
 
-# predict(model_folder = "YOLOv8s-p2", image_path = image_path)
+predict(model_folder = "YOLOv8s-p2", image_path = image_path)
 
 for u in uncertainty_threshold:
     ensemble("ensemble_YOLOv8s-p2", image_path, ensemble_count, confidence_threshold, iou_threshold, uncertainty_threshold = u)
-
-
