@@ -182,18 +182,20 @@ def evaluate_ensemble(predictions_folder, test_folder):
 
 # https://docs.ultralytics.com/reference/utils/metrics/
 
+name = "YOLOv8l"
+
 # SINGE METRICS
-results = evaluate_single("single_YOLOv8s-p2\\10\labels", "datasets\crystals\labels\\test")
-print("---RESULTS SINGLE---")
-print("AP@50: ", results.box.ap50)
-print("mAP@50: ", results.box.map50)
-print("AP@50-95: ", results.box.ap)
-print("mAP@50-95: ", results.box.map)
-print("F1: ", results.box.f1)
-print()
+# results = evaluate_single("single_" + name + "\\10\labels", "datasets\crystals\labels\\test")
+# print("---RESULTS SINGLE---")
+# print("AP@50: ", results.box.ap50)
+# print("mAP@50: ", results.box.map50)
+# print("AP@50-95: ", results.box.ap)
+# print("mAP@50-95: ", results.box.map)
+# print("F1: ", results.box.f1)
+# print()
 
 # ENSEMBLE METRICS
-results = evaluate_ensemble("ensemble_YOLOv8s-p2\output\\100.00", "datasets\crystals\labels\\test")
+results = evaluate_ensemble("ensemble_" + name + "\output\\100.00", "datasets\crystals\labels\\test")
 print("---RESULTS ENSEMBLE---")
 print("AP@50: ", results.box.ap50)
 print("mAP@50: ", results.box.map50)
