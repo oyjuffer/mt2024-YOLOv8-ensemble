@@ -155,3 +155,4 @@ cython_debug/
 *.pt
 *.jpg
 *.png
+*.jpeg

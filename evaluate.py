@@ -3,6 +3,7 @@ import os
 import json
 
 import numpy as np
+import matplotlib.pyplot as plt
 from ultralytics.utils.metrics import DetMetrics, ConfusionMatrix
 from ultralytics.models.yolo.detect import DetectionValidator
 from ultralytics.utils.ops import xywh2xyxy
@@ -178,14 +179,190 @@ def evaluate_ensemble(predictions_folder, test_folder):
 
     return metrics
 
+def iou(box1, box2):
+    """
+    Calculate the Intersection over Union (IoU) of two bounding boxes.
+
+    Args:
+        box1 (tuple): Tuple containing the coordinates of the first bounding box (x, y, width, height).
+        box2 (tuple): Tuple containing the coordinates of the second bounding box (x, y, width, height).
+
+    Returns:
+        float: The IoU value.
+    """
+    c1, x1, y1, w1, h1 = box1
+    c2, x2, y2, w2, h2 = box2
+
+    # Calculate the coordinates of the intersection rectangle
+    x_intersection = max(x1, x2)
+    y_intersection = max(y1, y2)
+    w_intersection = max(0, min(x1 + w1, x2 + w2) - x_intersection)
+    h_intersection = max(0, min(y1 + h1, y2 + h2) - y_intersection)
+
+    # Calculate the area of intersection
+    intersection_area = w_intersection * h_intersection
+
+    # Calculate the area of each bounding box
+    box1_area = w1 * h1
+    box2_area = w2 * h2
+
+    # Calculate the union area
+    union_area = box1_area + box2_area - intersection_area
+
+    # Calculate the IoU
+    iou = intersection_area / (union_area + 1e-16)
+
+    return iou
+
+def reliability_plot(predictions_folder, test_folder):
+    confidence_bins = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1]
+    positive_bin_counts = np.zeros(len(confidence_bins) - 1)
+    negative_bin_counts = np.zeros(len(confidence_bins) - 1)
+
+    for prediction_file in os.listdir(predictions_folder):
+        # LOAD ALL THE PREDICTIONS
+        prediction_file_path = os.path.join(predictions_folder, prediction_file)
+        prediction_name = os.path.splitext(prediction_file)[0]
+
+        with open(prediction_file_path, "r") as f:
+            predictions = json.load(f)
+        
+        # Load ground truth
+        ground_truth = []
+        with open(os.path.join(test_folder, prediction_name + ".txt"), "r") as f:
+            for line in f:
+                line_data = [float(value) for value in line.split()]
+                ground_truth.append(line_data)
+
+        for p in predictions:
+            for gt in ground_truth:
+                if p[0] == gt[0] and iou([p[0], p[1], p[3], p[5], p[7]], gt) > 0.5:
+                    confidence = p[9]
+                    for i, bin_start in enumerate(confidence_bins[:-1]):
+                        bin_end = confidence_bins[i + 1]
+                        if bin_start <= confidence < bin_end:
+                            positive_bin_counts[i] += 1
+                            break
+                else:
+                    confidence = p[9]
+                    for i, bin_start in enumerate(confidence_bins[:-1]):
+                        bin_end = confidence_bins[i + 1]
+                        if bin_start <= confidence < bin_end:
+                            negative_bin_counts[i] += 1
+                            break
+
+    # Calculate the fraction of positives for each bin
+    total_count = positive_bin_counts + negative_bin_counts
+    fraction = positive_bin_counts / (total_count + 1e-16)
+
+    # Calculate bin centers
+    bin_centers = [(confidence_bins[i] + confidence_bins[i + 1]) / 2 for i in range(len(confidence_bins) - 1)]
+
+    # Plot reliability plot
+    plt.bar(bin_centers, fraction, width=0.05)
+    plt.plot([0, 1], [0, 1], 'r--', label='Perfect Calibration')
+    plt.xlabel('Predicted Confidence')
+    plt.ylabel('Fraction of Positives')
+    plt.title('Reliability Plot')
+
+    ece = calculate_ece(bin_centers, fraction)
+    plt.text(0.95, 0.05, f'ECE: {ece:.3f}', ha='right', va='bottom', transform=plt.gca().transAxes, bbox=dict(facecolor='white', alpha=0.5))
+
+
+
+
+    plt.grid(True)
+    plt.savefig('reliability_plot.png')
+    plt.show()
+                    
+def calculate_ece(bin_centers, fraction):
+    bin_width = bin_centers[1] - bin_centers[0]
+    confidence = [center + bin_width / 2 for center in bin_centers]
+    calibration_error = abs(confidence - fraction)
+    ece = np.sum(calibration_error * fraction)
+    return ece
+
+def binning(predictions_folder, test_folder):
+
+    bins = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1]
+    bins_conf = [[] for _ in range(len(bins) - 1)]
+
+    samples = []
+
+    for prediction_file in os.listdir(predictions_folder):
+        # LOAD ALL THE PREDICTIONS
+        prediction_file_path = os.path.join(predictions_folder, prediction_file)
+        prediction_name = os.path.splitext(prediction_file)[0]
+
+        with open(prediction_file_path, "r") as f:
+            predictions = json.load(f)
+        
+        # Load ground truth
+        ground_truth = []
+        with open(os.path.join(test_folder, prediction_name + ".txt"), "r") as f:
+            for line in f:
+                line_data = [float(value) for value in line.split()]
+                ground_truth.append(line_data)
+
+        for p in predictions:
+
+            matched = False
+            confidence = p[9]
+
+            for gt in ground_truth:
+
+                if p[0] == gt[0] and iou([p[0], p[1], p[3], p[5], p[7]], gt) > 0.5:
+                    samples.append((confidence, p[0], gt[0]))
+                    matched = True
+                    break
+
+            if not matched:
+                samples.append((confidence, p[0], gt[0]))
+        
+    # bin the samples
+    for s in samples:
+        for i, bin_start in enumerate(bins):
+            bin_end = bins[i + 1]
+            if bin_start <= s[0] < bin_end:
+                bins_conf[i].append((s[0], s[1], s[2]))
+                break
+    
+    return bins_conf
+
+def reliability(bins):
+
+    ece = 0
+    mean_confidence = []
+    fraction_positives = []
+    total_length = sum(len(bin) for bin in bins)
+
+    for bin in bins:
+
+        if not bin:
+            break
+
+        confidence = [conf[0] for conf in bin]
+        mean = np.mean(confidence)
+        mean_confidence.append(mean)
+
+        positives = 0
+        for label in bin:
+            if label[1] == label[2]:
+                positives += 1
+
+        fraction = positives / (len(bin) + 1e-16)
+        fraction_positives.append(fraction)
+
+        ece += len(bin) / total_length * abs(fraction - mean)
+            
+    return mean_confidence, fraction_positives, ece
+
 
 
 # https://docs.ultralytics.com/reference/utils/metrics/
 
-name = "YOLOv8l"
-
 # SINGE METRICS
-# results = evaluate_single("single_" + name + "\\10\labels", "datasets\crystals\labels\\test")
+# results = evaluate_single("single_YOLOv9c_ib\\10\labels", "datasets\icebear\labels\\test")
 # print("---RESULTS SINGLE---")
 # print("AP@50: ", results.box.ap50)
 # print("mAP@50: ", results.box.map50)
@@ -195,10 +372,25 @@ name = "YOLOv8l"
 # print()
 
 # ENSEMBLE METRICS
-results = evaluate_ensemble("ensemble_" + name + "\output\\100.00", "datasets\crystals\labels\\test")
-print("---RESULTS ENSEMBLE---")
-print("AP@50: ", results.box.ap50)
-print("mAP@50: ", results.box.map50)
-print("AP@50-95: ", results.box.ap)
-print("mAP@50-95: ", results.box.map)
-print("F1: ", results.box.f1)
+# results = evaluate_ensemble("ensemble_YOLOv9c\output\\100.00", "datasets\crystals\labels\\test")
+# print("---RESULTS ENSEMBLE---")
+# print("AP@50: ", results.box.ap50)
+# print("mAP@50: ", results.box.map50)
+# print("AP@50-95: ", results.box.ap)
+# print("mAP@50-95: ", results.box.map)
+# print("F1: ", results.box.f1)
+
+# reliability_plot("ensemble_YOLOv9c\output\\100.00", "datasets\crystals\labels\\test")
+
+bins = binning("ensemble_YOLOv9c\output\\100.00", "datasets\crystals\labels\\test")
+c, f, ece = reliability(bins)
+
+plt.plot(c, f, linewidth=2, marker='o', markersize=5, markerfacecolor='r')
+plt.plot([0, 1], [0, 1], color='0.7', linestyle='--', label='Perfect Calibration')
+plt.xlabel('Mean Predicted Confidence')
+plt.ylabel('Fraction of Positives')
+plt.title('Reliability Plot')
+plt.text(0.95, 0.05, f'ECE: {ece:.3f}', ha='right', va='bottom', transform=plt.gca().transAxes, bbox=dict(facecolor='white', alpha=0.5))
+plt.grid(True)
+plt.savefig('reliability_plot.png')
+plt.show()

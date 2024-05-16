@@ -20,7 +20,7 @@ def draw(predictions_path, image_path, save_path):
         for object in objects:
             label, x, x_std, y, y_std, w, w_std, h, h_std, confidence, confidence_std = object
 
-            if confidence < 0.25:
+            if confidence < 0:
                 continue
 
             height, width = image.shape[:2]

@@ -179,13 +179,13 @@ confidence_threshold = 0.01
 iou_threshold = 0.5
 uncertainty_threshold = np.arange(0.1, 2.1, 0.1)
 
-name = "YOLOv8l"
+name = "YOLOv9c"
 test = "datasets\crystals\images\\test"
 
-predict_single(name, test)
-predict_ensemble(name, test)
+# predict_single(name, test)
+# predict_ensemble(name, test)
 
-for u in uncertainty_threshold:
-    ensemble("ensemble_" + name, test, ensemble_count, confidence_threshold, iou_threshold, uncertainty_threshold = u)
+# for u in uncertainty_threshold:
+#     ensemble("ensemble_" + name + "_ib", test, ensemble_count, confidence_threshold, iou_threshold, uncertainty_threshold = u)
 
-ensemble("ensemble_" + name, test, ensemble_count, confidence_threshold, iou_threshold, uncertainty_threshold = 100)
+ensemble("ensemble_" + name, test, ensemble_count, confidence_threshold = 0.252, iou_threshold = 0.5, uncertainty_threshold = 200)
