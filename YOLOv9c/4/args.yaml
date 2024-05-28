@@ -12,13 +12,13 @@ save_period: -1
 cache: false
 device: null
 workers: 8
-project: YOLOv9c
+project: YOLOv9c2
 name: '4'
 exist_ok: true
-pretrained: true
+pretrained: false
 optimizer: auto
 verbose: true
-seed: 3
+seed: 4
 deterministic: false
 single_cls: false
 rect: false
@@ -102,4 +102,4 @@ erasing: 0.4
 crop_fraction: 1.0
 cfg: null
 tracker: botsort.yaml
-save_dir: YOLOv9c\4
+save_dir: YOLOv9c2\4

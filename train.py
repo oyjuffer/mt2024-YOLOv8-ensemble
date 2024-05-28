@@ -1,30 +1,23 @@
 from ultralytics import YOLO
-import gc
-import torch
 
 def train():
 
-    name = "YOLOv8l"
-    n = 10
+    name = "YOLOv9c"
+    i = 5
 
-    for i in range(n):
-
-        model = YOLO('yolov8l.yaml').load('yolov8l.pt')
-        model.train(data='crystals.yaml', 
-                            epochs=100,
-                            patience=10,
-                            imgsz=608,
-                            project=f'{name}',
-                            name=f'{i+1}',
-                            exist_ok = True,
-                            seed = i,
-                            deterministic = False)
+    model = YOLO('yolov9c.yaml')
+    model.info()
+    model.train(data='crystals.yaml', 
+                        epochs=100,
+                        patience=10,
+                        imgsz=608,
+                        project=f'{name}',
+                        name=f'{i}',
+                        exist_ok = True,
+                        seed = i,
+                        pretrained = False,
+                        deterministic = False)
         
-        del model
-        model = None
-        gc.collect()
-        torch.cuda.empty_cache()
-
 
 if __name__ == '__main__':
     train()
