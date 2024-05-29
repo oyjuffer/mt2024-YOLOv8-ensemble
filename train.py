@@ -3,7 +3,7 @@ from ultralytics import YOLO
 def train():
 
     name = "YOLOv9c"
-    i = 5
+    i = 10
 
     model = YOLO('yolov9c.yaml')
     model.info()

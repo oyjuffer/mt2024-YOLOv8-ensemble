@@ -12,7 +12,7 @@ save_period: -1
 cache: false
 device: null
 workers: 8
-project: YOLOv9c2
+project: YOLOv9c
 name: '1'
 exist_ok: true
 pretrained: false

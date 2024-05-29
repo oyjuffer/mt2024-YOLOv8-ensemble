@@ -225,9 +225,20 @@ def binning(predictions_folder, test_folder):
         # LOAD ALL THE PREDICTIONS
         prediction_file_path = os.path.join(predictions_folder, prediction_file)
         prediction_name = os.path.splitext(prediction_file)[0]
+        predictions = []
 
-        with open(prediction_file_path, "r") as f:
-            predictions = json.load(f)
+        try:
+            with open(prediction_file_path, "r") as f:
+                data = json.load(f)
+                for element in data:
+                    prediction = [element[i] for i in [0, 1, 3, 5, 7, 9]]
+                    predictions.append(prediction)
+        except:
+            with open(prediction_file_path, "r") as f:
+                for line in f:
+                    line_data = [float(value) for value in line.split()]
+                    predictions.append(line_data)
+
         
         # Load ground truth
         ground_truth = []
@@ -239,11 +250,11 @@ def binning(predictions_folder, test_folder):
         for p in predictions:
 
             matched = False
-            confidence = p[9]
+            confidence = p[5]
 
             for gt in ground_truth:
 
-                if p[0] == gt[0] and iou([p[0], p[1], p[3], p[5], p[7]], gt) > 0.5:
+                if p[0] == gt[0] and iou([p[0], p[1], p[2], p[3], p[4]], gt) > 0.5:
                     samples.append((confidence, p[0], gt[0]))
                     matched = True
                     break
@@ -271,7 +282,7 @@ def reliability(bins):
     for bin in bins:
 
         if not bin:
-            break
+            continue
 
         confidence = [conf[0] for conf in bin]
         mean = np.mean(confidence)
@@ -291,49 +302,59 @@ def reliability(bins):
 
 # https://docs.ultralytics.com/reference/utils/metrics/
 
-# SINGE METRICS
-# results = evaluate_single("single_YOLOv9c_ib\\10\labels", "datasets\icebear\labels\\test")
-# print("---RESULTS SINGLE---")
-# print("AP@50: ", results.box.ap50)
-# print("mAP@50: ", results.box.map50)
-# print("AP@50-95: ", results.box.ap)
-# print("mAP@50-95: ", results.box.map)
+folders = [
+    "YOLOv9c_predictions\\1\labels",
+    "YOLOv9c_predictions\\2\labels",
+    "YOLOv9c_predictions\\3\labels",
+    "YOLOv9c_predictions\\4\labels",
+    "YOLOv9c_predictions\\5\labels",
+    "YOLOv9c_predictions\\6\labels",
+    "YOLOv9c_predictions\\7\labels",
+    "YOLOv9c_predictions\\8\labels",
+    "YOLOv9c_predictions\\9\labels",
+    "YOLOv9c_predictions\\10\labels",
+]
+
+# # MODELS
+for idx, folder in enumerate(folders, start=1):
+    results = evaluate_single(folder, "datasets\crystals\labels\\test")
+    print(f"---MODEL {idx}---")
+    print("AP@50: ", results.box.ap50)
+    print("mAP@50: ", results.box.map50)
+    print("AP@50-95: ", results.box.ap)
+    print("mAP@50-95: ", results.box.map)
+    # print("F1: ", results.box.f1)
+    print()
+
+# ENSEMBLE
+ensemble_path = "YOLOv9c_predictions\ensemble_0.01"
+results = evaluate_ensemble(ensemble_path, "datasets\crystals\labels\\test")
+print("---ENSEMBLE---")
+print("AP@50: ", results.box.ap50)
+print("mAP@50: ", results.box.map50)
+print("AP@50-95: ", results.box.ap)
+print("mAP@50-95: ", results.box.map)
 # print("F1: ", results.box.f1)
-# print()
+results.confusion_matrix.plot(normalize = False, names=('clustered other', 'clear', 'discrete crystal', 'precipitate', 'clustered crystals', 'discrete other'))
+results.confusion_matrix.plot(normalize = True, names=('clustered other', 'clear', 'discrete crystal', 'precipitate', 'clustered crystals', 'discrete other'))
 
-# bins = binning("single_YOLOv9c\\1\labels", "datasets\crystals\labels\\test")
-# c, f, ece = reliability(bins)
+# CALIBRATION PLOT
+plt.figure(figsize=(10, 8))
+for idx, folder in enumerate(folders, start=1):
+    # Load all the predictions
+    bins = binning(folder, "datasets\crystals\labels\\test")
+    c, f, ece = reliability(bins)
+    plt.plot(c, f, linewidth=1, marker='o', markersize=3, label=f'Model {idx} (ECE: {ece:.3f})')
 
-# plt.plot(c, f, linewidth=2, marker='o', markersize=5, markerfacecolor='r')
-# plt.plot([0, 1], [0, 1], color='0.7', linestyle='--', label='Perfect Calibration')
-# plt.xlabel('Mean Predicted Confidence')
-# plt.ylabel('Fraction of Positives')
-# plt.title('Reliability Plot')
-# plt.text(0.95, 0.05, f'ECE: {ece:.3f}', ha='right', va='bottom', transform=plt.gca().transAxes, bbox=dict(facecolor='white', alpha=0.5))
-# plt.grid(True)
-# plt.savefig('reliability_plot_single.png')
-# plt.show()
-
-
-# ENSEMBLE METRICS
-# results = evaluate_ensemble("ensemble_YOLOv9c\output\\100.00", "datasets\crystals\labels\\test")
-# print("---RESULTS ENSEMBLE---")
-# print("AP@50: ", results.box.ap50)
-# print("mAP@50: ", results.box.map50)
-# print("AP@50-95: ", results.box.ap)
-# print("mAP@50-95: ", results.box.map)
-# print("F1: ", results.box.f1)
-
-
-bins = binning("ensemble_YOLOv9c\output\\100.00", "datasets\crystals\labels\\test")
+bins = binning(ensemble_path, "datasets\crystals\labels\\test")
 c, f, ece = reliability(bins)
-
-plt.plot(c, f, linewidth=2, marker='o', markersize=5, markerfacecolor='r')
+plt.plot(c, f, linewidth=2, marker='o', markersize=5, label=f'Ensemble (ECE: {ece:.3f})', color='black')
 plt.plot([0, 1], [0, 1], color='0.7', linestyle='--', label='Perfect Calibration')
+
+# Add labels and titles. 
 plt.xlabel('Mean Predicted Confidence')
 plt.ylabel('Fraction of Positives')
 plt.title('Reliability Plot')
-plt.text(0.95, 0.05, f'ECE: {ece:.3f}', ha='right', va='bottom', transform=plt.gca().transAxes, bbox=dict(facecolor='white', alpha=0.5))
 plt.grid(True)
-plt.savefig('reliability_plot_ensemble.png')
-plt.show()
+plt.legend(loc='best')
+plt.savefig('reliability_plot.png')
