@@ -18,7 +18,7 @@ def draw(predictions_path, image_path, save_path):
             continue
 
         for object in objects:
-            label, x, x_std, y, y_std, w, w_std, h, h_std, confidence, confidence_std = object
+            label, x, x_std, y, y_std, w, w_std, h, h_std, confidence = object
 
             if confidence < 0:
                 continue
@@ -61,8 +61,6 @@ def draw(predictions_path, image_path, save_path):
             cv2.putText(image, f"{object_name}: {confidence:.2f}", (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, colour, 1)
 
         # Save the output image
-
-        path = os.path.join(save_path, "images")
         os.makedirs(save_path, exist_ok=True)
         output_path = os.path.join(save_path, f"{image_name}.jpg")
         cv2.imwrite(output_path, image)
@@ -70,7 +68,7 @@ def draw(predictions_path, image_path, save_path):
 
 
 # DRAW BOUNDING BOXES ON IMAGES
-predictions_path = "YOLOv9c_predictions\output_0.15"
-image_path = "datasets\crystals\images\\test"
-save_path = "YOLOv9c_images"
+predictions_path = "YOLOv9c_predictions_0.15_coco\ensemble_8"
+image_path = "datasets\coco\images\\test"
+save_path = "YOLOv9c_images_coco"
 draw(predictions_path, image_path, save_path)
