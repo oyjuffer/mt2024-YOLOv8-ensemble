@@ -134,10 +134,10 @@ def ensemble(ensemble_path, images_path, ensemble_count, confidence_threshold, i
             json.dump(output, file, indent=4)
 
 # GENERATE MODEL AND ENSEMBLE PREDICTIONS
-project = "YOLOv9c_predictions_0.01_coco"
-conf = 0.01
+project = "YOLOv9c_predictions_0.15_icebear"
+conf = 0.15
 iou = 0.55
 
-# predict(project, "YOLOv9c", "datasets\coco\images\\test", conf, iou)
-for m in range(7, 11):
-    ensemble(project, "datasets\coco\images\\test", m, conf, iou)
+predict(project, "YOLOv9c", "datasets\icebear\images\\test", conf, iou)
+for m in range(1, 11):
+    ensemble(project, "datasets\icebear\images\\test", m, conf, iou)

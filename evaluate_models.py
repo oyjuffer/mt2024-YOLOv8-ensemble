@@ -1,9 +1,8 @@
 import torch
 import os
 import json
-
 import numpy as np
-import torch
+
 from ultralytics.utils.metrics import DetMetrics, ConfusionMatrix
 from ultralytics.models.yolo.detect import DetectionValidator
 from ultralytics.utils.ops import xywh2xyxy
@@ -180,24 +179,13 @@ def evaluate_ensemble(predictions_folder, test_folder):
 
 # https://docs.ultralytics.com/reference/utils/metrics/
 test_path = "datasets\crystals\labels\\test"
-ensemble_path = "YOLOv9c_predictions_0.15\ensemble_10"
-model_paths = [
-    "YOLOv9c_predictions_0.15\\1\labels",
-    "YOLOv9c_predictions_0.15\\2\labels",
-    "YOLOv9c_predictions_0.15\\3\labels",
-    "YOLOv9c_predictions_0.15\\4\labels",
-    "YOLOv9c_predictions_0.15\\5\labels",
-    "YOLOv9c_predictions_0.15\\6\labels",
-    "YOLOv9c_predictions_0.15\\7\labels",
-    "YOLOv9c_predictions_0.15\\8\labels",
-    "YOLOv9c_predictions_0.15\\9\labels",
-    "YOLOv9c_predictions_0.15\\10\labels",
-]
+m = 10
 
 # MODELS
-for idx, folder in enumerate(model_paths, start=1):
-    results = evaluate_single(folder, test_path)
-    print(f"---MODEL {idx}---")
+for i in range(1, m + 1):
+    model_path = f"YOLOv9c_predictions_0.15\\{i}\labels"
+    results = evaluate_single(model_path, test_path)
+    print(f"---MODEL {i}---")
     print("AP@50: ", results.box.ap50)
     print("mAP@50: ", results.box.map50)
     print("AP@50-95: ", results.box.ap)
@@ -206,14 +194,16 @@ for idx, folder in enumerate(model_paths, start=1):
     print()
 
 # ENSEMBLE
-results = evaluate_ensemble(ensemble_path, test_path)
-print("---ENSEMBLE---")
-print("AP@50: ", results.box.ap50)
-print("mAP@50: ", results.box.map50)
-print("AP@50-95: ", results.box.ap)
-print("mAP@50-95: ", results.box.map)
-# print("F1: ", results.box.f1)
-results.confusion_matrix.plot(normalize = False, names=('clustered other', 'clear', 'discrete crystal', 'precipitate', 'clustered crystals', 'discrete other'))
-results.confusion_matrix.plot(normalize = True, names=('clustered other', 'clear', 'discrete crystal', 'precipitate', 'clustered crystals', 'discrete other'))
-print()
+for i in range(1, m + 1):
+    ensemble_path = f"YOLOv9c_predictions_0.15\ensemble_{i}"
+    results = evaluate_ensemble(ensemble_path, test_path)
+    print(f"---ENSEMBLE {i}---")
+    print("AP@50: ", results.box.ap50)
+    print("mAP@50: ", results.box.map50)
+    print("AP@50-95: ", results.box.ap)
+    print("mAP@50-95: ", results.box.map)
+    # print("F1: ", results.box.f1)
+    # results.confusion_matrix.plot(normalize = False, names=('clustered other', 'clear', 'discrete crystal', 'precipitate', 'clustered crystals', 'discrete other'))
+    # results.confusion_matrix.plot(normalize = True, names=('clustered other', 'clear', 'discrete crystal', 'precipitate', 'clustered crystals', 'discrete other'))
+    print()
 
