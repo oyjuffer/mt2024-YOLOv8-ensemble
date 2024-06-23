@@ -1,38 +1,61 @@
 import cv2
 
-# Read the image
-image = cv2.imread('datasets/crystals/images/test/018u_D4_ImagerDefaults_6.png')
+image1 = cv2.imread('datasets/crystals/images/test/018u_D4_ImagerDefaults_6.png')
+data1 = [
+    [3, 0.47636916847441696, 0.010053545714531183, 0.45628269194375465, 0.010559754455518992, 0.6386911972565193, 0.044008118069820384, 0.8455452226274673, 0.021221242124706136, 0.34483929999999996]
+]
 
-# Define the coordinates and dimensions for the primary bounding box (normalized)
-x1, y1, w1, h1 = 0.47636916847441696, 0.45628269194375465, 0.6386911972565193, 0.8455452226274673
+image2 = cv2.imread('datasets\crystals\images\\test\\folderID729_plateID1729_batchID7282_wellNum41_profileID1_d1_r115039_ef.png')
+data2 = [
+    [2, 0.5979408932923195, 0.0011313740751933696, 0.318539126897852, 0.0010529406547590127, 0.07710316642205949, 0.0021898097089097963, 0.10169633707191547, 0.0025044615464034923, 0.8161792999999999],
+    [2, 0.624163046891455, 0.0012365676857806717, 0.5649934842799053, 0.0014281309008104277, 0.09349808434831194, 0.0031909088021613214, 0.11593579018030094, 0.004674648957291693, 0.8066459],
+    [2, 0.7369059147801237, 0.0011648144430287779, 0.3138127007631916, 0.0016120620818467174, 0.06553483922832745, 0.003112522338855537, 0.07833459913264278, 0.002818042907586131, 0.6282302],
+    [2, 0.5701014747308535, 0.0010662662347030198, 0.17159679982167078, 0.0038546055966442844, 0.09835060697362286, 0.0038247364097147886, 0.16392581488354707, 0.00871578026944669, 0.7533258],
+    [2, 0.5137234219012377, 0.007097966047820342, 0.45617247403371564, 0.0014044330564906807, 0.11251907275323002, 0.015173676392552609, 0.09007410514672977, 0.004731490262387719, 0.7318317000000001],
+    [2, 0.5442686651339694, 0.0005820385045943634, 0.5277207281976414, 0.0008533666133440801, 0.059204121590382366, 0.0017607704630090407, 0.06055892590563654, 0.0016570688599151244, 0.6746277],
+    [2, 0.4576046923486639, 0.0007451060769263085, 0.09495119587678501, 0.0016117101826182366, 0.07916636931782771, 0.0034261842907385345, 0.0891895026624376, 0.0036175536054396614, 0.6293293],
+    [2, 0.5726749821249626, 0.000780231657885542, 0.41389483996861715, 0.001246413783549035, 0.05414200384612157, 0.001869874136066188, 0.07183951895065083, 0.0017184810376793267, 0.6197022],
+    [2, 0.5889204217264205, 0.0018559724227517212, 0.047727006655750456, 0.0015376089442192334, 0.09888603460630709, 0.007945715548781013, 0.08489143424586423, 0.00477175014706834, 0.3270976]
+]
 
-# Define the coordinates and dimensions for the lightly shaded bounding box (normalized)
-x2, y2, w2, h2 = 0.47636916847441696, 0.45628269194375465, 0.692752861040871, 0.8773262192076925
+
+image = image1
+data = data1
 
 # Get image dimensions
 height, width = image.shape[:2]
+colour_primary = (178,255,255)
+colour_secondary = (2,95,217)
 
-# Convert normalized coordinates to absolute coordinates
-x1_abs = int((x1 - w1 / 2) * width)
-y1_abs = int((y1 - h1 / 2) * height)
-w1_abs = int(w1 * width)
-h1_abs = int(h1 * height)
+# Iterate over each data entry
+for entry in data:
+    # Extract normalized coordinates and dimensions
+    x_mean, y_mean, w_mean, h_mean = entry[1], entry[3], entry[5], entry[7]
+    x_std, y_std, w_std, h_std = entry[2], entry[4], entry[6], entry[8]
+    std = 1  # Standard deviation multiplier
 
-x2_abs = int((x2 - w2 / 2) * width)
-y2_abs = int((y2 - h2 / 2) * height)
-w2_abs = int(w2 * width)
-h2_abs = int(h2 * height)
+    # Compute the fuzzy bounding box adjustments
+    w2_fuzzy = w_mean + w_std * std + x_std * std
+    h2_fuzzy = h_mean + h_std * std + y_std * std
 
-# Define the color and thickness for the bounding boxes
-colour = (0, 255, 0)  # Green color
+    # Convert normalized coordinates to absolute coordinates for primary bounding box
+    x1_abs = int((x_mean - w_mean / 2) * width)
+    y1_abs = int((y_mean - h_mean / 2) * height)
+    w1_abs = int(w_mean * width)
+    h1_abs = int(h_mean * height)
 
-# Draw the primary bounding box (transparent)
-cv2.rectangle(image, (x1_abs, y1_abs), (x1_abs + w1_abs, y1_abs + h1_abs), colour, 2)
+    # Convert normalized coordinates to absolute coordinates for secondary (fuzzy) bounding box
+    x2_abs = int((x_mean - w2_fuzzy / 2) * width)
+    y2_abs = int((y_mean - h2_fuzzy / 2) * height)
+    w2_abs = int(w2_fuzzy * width)
+    h2_abs = int(h2_fuzzy * height)
 
-# Draw the lightly shaded bounding box beneath the primary one (transparent)
-cv2.rectangle(image, (x2_abs, y2_abs), (x2_abs + w2_abs, y2_abs + h2_abs), colour, 1)  
+    # Draw the primary bounding box (yellow)
+    cv2.rectangle(image, (x1_abs, y1_abs), (x1_abs + w1_abs, y1_abs + h1_abs), colour_primary, 1)
 
-# Display the image
-cv2.imshow('Bounding Box', image)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+    # Draw the secondary bounding box (orange)
+    cv2.rectangle(image, (x2_abs, y2_abs), (x2_abs + w2_abs, y2_abs + h2_abs), colour_secondary, 1)
+
+# Save the image
+output_path = 'fuzzy_drop.png'
+cv2.imwrite(output_path, image)

@@ -134,8 +134,8 @@ def ensemble(ensemble_path, images_path, ensemble_count, confidence_threshold, i
             json.dump(output, file, indent=4)
 
 # GENERATE MODEL AND ENSEMBLE PREDICTIONS
-project = "YOLOv9c_predictions_0.15_icebear"
-conf = 0.15
+project = "YOLOv9c_predictions_0.01_icebear"
+conf = 0.01
 iou = 0.55
 
 predict(project, "YOLOv9c", "datasets\icebear\images\\test", conf, iou)

@@ -178,32 +178,32 @@ def evaluate_ensemble(predictions_folder, test_folder):
     return metrics
 
 # https://docs.ultralytics.com/reference/utils/metrics/
-test_path = "datasets\icebear\labels\\test"
+test_path = "datasets\crystals\labels\\test"
 m = 10
 
 # MODELS
-for i in range(1, m + 1):
-    model_path = f"YOLOv9c_predictions_0.15_icebear\\{i}\labels"
-    results = evaluate_single(model_path, test_path)
-    print(f"---MODEL {i}---")
-    print("AP@50: ", results.box.ap50)
-    print("mAP@50: ", results.box.map50)
-    print("AP@50-95: ", results.box.ap)
-    print("mAP@50-95: ", results.box.map)
-    # print("F1: ", results.box.f1)
-    print()
+# for i in range(1, m + 1):
+#     model_path = f"YOLOv9c_predictions_0.15_icebear\\{i}\labels"
+#     results = evaluate_single(model_path, test_path)
+#     print(f"---MODEL {i}---")
+#     print("AP@50: ", results.box.ap50)
+#     print("mAP@50: ", results.box.map50)
+#     print("AP@50-95: ", results.box.ap)
+#     print("mAP@50-95: ", results.box.map)
+#     # print("F1: ", results.box.f1)
+#     print()
 
 # ENSEMBLE
 for i in range(1, m + 1):
-    ensemble_path = f"YOLOv9c_predictions_0.15_icebear\ensemble_{i}"
+    ensemble_path = f"YOLOv9c_predictions_0.15\ensemble_{i}"
     results = evaluate_ensemble(ensemble_path, test_path)
     print(f"---ENSEMBLE {i}---")
     print("AP@50: ", results.box.ap50)
     print("mAP@50: ", results.box.map50)
     print("AP@50-95: ", results.box.ap)
     print("mAP@50-95: ", results.box.map)
-    # print("F1: ", results.box.f1)
-    # results.confusion_matrix.plot(normalize = False, names=('clustered other', 'clear', 'discrete crystal', 'precipitate', 'clustered crystals', 'discrete other'))
-    # results.confusion_matrix.plot(normalize = True, names=('clustered other', 'clear', 'discrete crystal', 'precipitate', 'clustered crystals', 'discrete other'))
+    print("F1: ", results.box.f1)
+    results.confusion_matrix.plot(normalize = False, names=('clustered other', 'clear', 'discrete crystal', 'precipitate', 'clustered crystals', 'discrete other'))
+    results.confusion_matrix.plot(normalize = True, names=('clustered other', 'clear', 'discrete crystal', 'precipitate', 'clustered crystals', 'discrete other'))
     print()
 
