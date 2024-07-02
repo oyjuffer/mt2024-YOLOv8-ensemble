@@ -68,7 +68,7 @@ def draw(predictions_path, image_path, save_path):
 
 
 # DRAW BOUNDING BOXES ON IMAGES
-predictions_path = "YOLOv9c_predictions_0.15_coco\ensemble_8"
-image_path = "datasets\coco\images\\test"
-save_path = "YOLOv9c_images_coco"
+predictions_path = "YOLOv9c_predictions_0.15\ensemble_1"
+image_path = "datasets\crystals\images\\test"
+save_path = "YOLOv9c_images_0.15_model1"
 draw(predictions_path, image_path, save_path)
